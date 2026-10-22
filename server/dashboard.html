@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreeLLM Dashboard</title>
+<link rel="icon" type="image/png" href="__BASE__/favicon.png">
+<style>
+  :root {
+    --bg: #f4f0e8;
+    --bg-soft: #ece5d8;
+    --card: #fffdf8;
+    --card-soft: #f7f1e7;
+    --border: #dbd1c2;
+    --border-soft: #ebe2d6;
+    --text: #1f1a14;
+    --dim: #6e6558;
+    --faint: #9a8f7f;
+    --green: #3e6b54;
+    --red: #b45443;
+    --yellow: #9a6f1f;
+    --blue: #355e7d;
+    --indigo: #6c6e77;
+    --shadow: 0 24px 40px -30px rgba(31, 26, 20, .28);
+    --radius: 18px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(1100px 560px at 100% 0%, rgba(53,94,125,.08), transparent 58%),
+      radial-gradient(920px 480px at 0% 0%, rgba(62,107,84,.08), transparent 56%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: .01em;
+  }
+  ::selection { background: rgba(53,94,125,.18); }
+
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; gap: 1rem;
+    padding: 1rem 1.75rem;
+    background: rgba(244,240,232,.84);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .brand { display: flex; align-items: center; gap: .8rem; font-weight: 650; font-size: 1.05rem; }
+  .brand .title { display: flex; align-items: baseline; gap: .35rem; flex-wrap: wrap; }
+  .brand .title .byline { color: var(--faint); font-size: .84rem; font-weight: 500; }
+  .brand .logo {
+    width: 36px; height: 36px; border-radius: 12px;
+    display: grid; place-items: center;
+    background: rgba(255,253,248,.9);
+    border: 1px solid var(--border);
+    box-shadow: 0 10px 20px -18px rgba(31,26,20,.45);
+    overflow: hidden;
+  }
+  .brand .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .brand small { color: var(--faint); font-weight: 500; font-size: .72rem; letter-spacing: .04em; }
+  .topbar .spacer { flex: 1; }
+  .btn-ghost {
+    background: rgba(255,253,248,.72); border: 1px solid var(--border); color: var(--dim);
+    padding: .5rem .9rem; border-radius: 999px; cursor: pointer; font-size: .82rem; font-weight: 600;
+    transition: all .18s;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--text); background: rgba(255,253,248,.98); }
+
+  .container { max-width: 1180px; margin: 0 auto; padding: 2rem 1.75rem 2.4rem; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .9rem; margin-bottom: 1.25rem; }
+  .stat {
+    background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.2rem 1.25rem; box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .stat::after { content: ''; position: absolute; left: 1.25rem; right: 1.25rem; top: 0; height: 3px; border-radius: 999px; background: var(--accent, rgba(53,94,125,.2)); }
+  .stat .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--faint); margin-bottom: .5rem; }
+  .stat .value { font-size: 2rem; font-weight: 650; line-height: 1; }
+  .stat .sub { display: none; }
+  .stat.green .value { color: var(--green); } .stat.green { --accent: rgba(62,107,84,.3); }
+  .stat.yellow .value { color: var(--yellow); } .stat.yellow { --accent: rgba(154,111,31,.28); }
+  .stat.blue .value { color: var(--blue); } .stat.blue { --accent: rgba(53,94,125,.26); }
+
+  .section-title { display: flex; align-items: center; gap: .6rem; font-size: .95rem; font-weight: 600; color: var(--text); margin: .35rem 0 .9rem; }
+  .count-badge { font-size: .72rem; font-weight: 600; color: var(--dim); background: rgba(255,253,248,.74); border: 1px solid var(--border); padding: .16rem .58rem; border-radius: 999px; }
+
+  .default-model-bar {
+    background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.1rem 1.25rem; margin-bottom: 1.7rem; box-shadow: var(--shadow);
+    display: flex; align-items: center; gap: .85rem; flex-wrap: wrap;
+  }
+  .default-model-bar .dm-label { font-size: .82rem; font-weight: 600; white-space: nowrap; display: flex; align-items: center; gap: .45rem; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
+  .default-model-bar .dm-label .ic { color: var(--blue); }
+  .default-model-bar .current { font-family: 'Cascadia Code', 'Consolas', monospace; color: var(--text); font-size: .84rem; background: var(--bg-soft); border: 1px solid var(--border); padding: .34rem .68rem; border-radius: 999px; }
+  .default-model-bar .hint { font-size: .76rem; color: var(--faint); }
+
+  .model-form { display: flex; gap: .5rem; margin-left: auto; }
+  .model-form input,
+  .model-form select {
+    flex: 1; min-width: 180px; background: rgba(255,255,255,.65); border: 1px solid var(--border); border-radius: 12px; padding: .58rem .8rem; color: var(--text); font-size: .85rem; outline: none; transition: border-color .18s, box-shadow .18s, background .18s;
+  }
+  .model-form input::placeholder { color: var(--faint); }
+  .model-form input:focus,
+  .model-form select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53,94,125,.12); background: #fff; }
+  .model-form select:disabled { color: var(--faint); opacity: .8; cursor: not-allowed; }
+  .btn-primary { background: var(--text); border: 1px solid var(--text); color: var(--card); padding: .56rem 1rem; border-radius: 999px; cursor: pointer; font-size: .83rem; font-weight: 600; white-space: nowrap; transition: transform .12s, box-shadow .18s, opacity .18s, background .18s, color .18s; box-shadow: 0 14px 20px -18px rgba(31,26,20,.65); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 24px -18px rgba(31,26,20,.8); background: #36302a; border-color: #36302a; }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .section-head { display: flex; align-items: flex-end; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .section-head .sh-text { display: flex; flex-direction: column; gap: .3rem; min-width: 0; }
+  .section-head .sh-title { display: flex; align-items: center; gap: .55rem; font-size: .95rem; font-weight: 600; color: var(--text); }
+  .section-head .sh-title .ic { color: var(--blue); }
+  .section-head .sh-sub { font-size: .78rem; color: var(--faint); }
+  .section-head .sh-sub code { font-family: 'Cascadia Code','Consolas',monospace; color: var(--dim); background: rgba(236,229,216,.8); padding: .05rem .35rem; border-radius: 5px; }
+  .section-head .sh-action { margin-left: auto; }
+  .btn-primary.with-icon { display: inline-flex; align-items: center; gap: .45rem; }
+  .btn-primary .plus { font-size: 1.1rem; line-height: 1; margin-top: -2px; }
+
+  .apikey-list { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1.75rem; }
+  .apikey-row {
+    display: flex; align-items: center; gap: .9rem;
+    background: var(--card);
+    border: 1px solid var(--border); border-radius: 16px; padding: .9rem 1rem;
+    transition: border-color .18s;
+  }
+  .apikey-row:hover { border-color: var(--text); }
+  .apikey-row .ak-avatar { width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; font-size: 1rem; background: var(--bg-soft); border: 1px solid var(--border); }
+  .apikey-row .ak-info { min-width: 0; flex: 1; }
+  .apikey-row .ak-name { font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .apikey-row .ak-name .unnamed { color: var(--faint); font-weight: 500; font-style: italic; }
+  .apikey-row .ak-key { font-family: 'Cascadia Code','Consolas',monospace; font-size: .78rem; color: var(--dim); margin-top: .25rem; }
+  .apikey-row .ak-created { font-size: .76rem; color: var(--faint); white-space: nowrap; text-align: right; }
+  .apikey-row .ak-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+  .btn-danger { background: transparent; border: 1px solid rgba(180,84,67,.35); color: var(--red); padding: .45rem .85rem; border-radius: 999px; cursor: pointer; font-size: .8rem; font-weight: 600; white-space: nowrap; transition: all .18s; }
+  .btn-danger:hover { background: rgba(180,84,67,.08); border-color: var(--red); color: #944535; }
+  .apikey-empty { color: var(--dim); text-align: center; padding: 1.75rem; font-size: .9rem; background: rgba(255,253,248,.55); border: 1px dashed var(--border); border-radius: var(--radius); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.25rem; box-shadow: var(--shadow);
+    transition: transform .18s, border-color .18s, box-shadow .18s;
+    position: relative; overflow: hidden;
+  }
+  .card::before { content: ''; position: absolute; left: 1.25rem; right: 1.25rem; top: 0; height: 3px; border-radius: 999px; background: var(--strip, var(--green)); opacity: .82; }
+  .card.is-busy { --strip: var(--yellow); }
+  .card:hover { transform: translateY(-2px); border-color: var(--text); box-shadow: 0 22px 36px -28px rgba(31,26,20,.48); }
+  .card-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+  .avatar {
+    width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0;
+    display: grid; place-items: center; font-weight: 700; font-size: 1rem; color: #fff; text-transform: uppercase;
+    background: linear-gradient(135deg, var(--blue), #507392);
+  }
+  .card-titles { min-width: 0; flex: 1; }
+  .client-name { font-weight: 600; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .client-sub { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: .74rem; color: var(--faint); margin-top: .15rem; }
+  .badge { display: inline-flex; align-items: center; gap: .4rem; font-size: .72rem; font-weight: 600; padding: .28rem .6rem; border-radius: 999px; white-space: nowrap; }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .badge.online { color: var(--green); background: rgba(62,107,84,.1); border: 1px solid rgba(62,107,84,.22); }
+  .badge.online .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .badge.busy { color: var(--yellow); background: rgba(154,111,31,.12); border: 1px solid rgba(154,111,31,.24); }
+  .badge.busy .dot { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+
+  .meta { display: grid; grid-template-columns: auto 1fr; gap: .45rem .8rem; font-size: .82rem; margin-bottom: 1.1rem; }
+  .meta .k { color: var(--faint); white-space: nowrap; }
+  .meta .v { color: var(--text); text-align: right; word-break: break-all; }
+  .meta .v.mono { font-family: 'Cascadia Code', 'Consolas', monospace; font-size: .78rem; }
+  .meta .v .chip { background: rgba(236,229,216,.9); border: 1px solid var(--border); color: var(--text); padding: .12rem .5rem; border-radius: 999px; font-family: 'Cascadia Code','Consolas',monospace; font-size: .76rem; }
+
+  .card .model-form { margin-left: 0; }
+  .card .model-form input { background: rgba(255,255,255,.65); }
+  .card .model-form .btn-primary { padding: .56rem .9rem; }
+
+  .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--card); border: 1px solid var(--border); padding: .85rem 1.25rem; border-radius: 14px; font-size: .85rem; opacity: 0; transform: translateY(8px); transition: opacity .25s, transform .25s; pointer-events: none; z-index: 100; box-shadow: var(--shadow); border-left: 3px solid var(--green); }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { border-left-color: var(--red); color: var(--red); }
+
+  .empty { color: var(--dim); text-align: center; padding: 4rem 2rem; font-size: 1rem; background: rgba(255,253,248,.55); border: 1px dashed var(--border); border-radius: var(--radius); }
+  .empty .big { font-size: 2.5rem; margin-bottom: .75rem; opacity: .7; }
+
+  #login { position: fixed; inset: 0; background: radial-gradient(900px 500px at 50% -10%, rgba(53,94,125,.14), transparent 60%), var(--bg); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1.5rem; }
+  #login .box { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 2.25rem; width: 100%; max-width: 380px; box-shadow: 0 30px 60px -36px rgba(31,26,20,.45); }
+  #login .lhead { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 1.75rem; }
+  #login .logo { width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; margin-bottom: 1rem; background: rgba(255,253,248,.9); border: 1px solid var(--border); box-shadow: 0 18px 26px -22px rgba(31,26,20,.5); overflow: hidden; }
+  #login .logo img { width: 100%; height: 100%; object-fit: contain; }
+  #login h2 { font-size: 1.4rem; font-weight: 700; }
+  #login .tag { color: var(--faint); font-size: .82rem; margin-top: .35rem; letter-spacing: .3px; }
+  #login label { display: block; font-size: .8rem; color: var(--dim); margin-bottom: .45rem; font-weight: 500; }
+  #login input { width: 100%; background: rgba(255,255,255,.68); border: 1px solid var(--border); border-radius: 14px; padding: .78rem .9rem; color: var(--text); font-size: .92rem; outline: none; margin-bottom: 1rem; transition: border-color .18s, box-shadow .18s, background .18s; }
+  #login input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53,94,125,.12); background: #fff; }
+  #login button { width: 100%; background: var(--text); border: 1px solid var(--text); color: var(--card); padding: .78rem; border-radius: 999px; cursor: pointer; font-size: .92rem; font-weight: 600; transition: transform .12s, box-shadow .18s, background .18s; box-shadow: 0 12px 20px -18px rgba(31,26,20,.8); }
+  #login button:hover { transform: translateY(-1px); }
+  #login button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  #login .err { color: var(--red); font-size: .82rem; margin-top: -.35rem; margin-bottom: 1rem; min-height: 1em; }
+
+  .card { cursor: pointer; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(31,26,20,.22); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 150; padding: 1.5rem; }
+  .modal-overlay.show { display: flex; animation: fade .2s ease; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 24px; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; box-shadow: 0 40px 80px -42px rgba(31,26,20,.6); animation: pop .22s ease; }
+  @keyframes pop { from { transform: scale(.96) translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .modal-head { display: flex; align-items: center; gap: .9rem; padding: 1.35rem 1.5rem; border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; background: var(--card); border-radius: 24px 24px 0 0; z-index: 1; }
+  .modal-head .avatar { width: 46px; height: 46px; font-size: 1.15rem; }
+  .modal-head .mh-titles { flex: 1; min-width: 0; }
+  .modal-head .mh-name { font-size: 1.15rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .modal-head .mh-sub { font-family: 'Cascadia Code','Consolas',monospace; font-size: .76rem; color: var(--faint); margin-top: .2rem; }
+  .modal-head .badge { flex-shrink: 0; }
+  .modal-close { background: transparent; border: 1px solid var(--border); color: var(--dim); width: 34px; height: 34px; border-radius: 12px; cursor: pointer; font-size: 1.1rem; line-height: 1; transition: all .18s; flex-shrink: 0; }
+  .modal-close:hover { color: var(--text); border-color: var(--text); background: rgba(236,229,216,.65); }
+  .modal-body { padding: 1.5rem; }
+  .mb-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .85rem; margin-bottom: 1.5rem; }
+  .mb-stat { background: rgba(236,229,216,.52); border: 1px solid var(--border); border-radius: 14px; padding: .9rem; text-align: center; }
+  .mb-stat .v { font-size: 1.45rem; font-weight: 700; }
+  .mb-stat.blue .v { color: var(--blue); } .mb-stat.green .v { color: var(--green); } .mb-stat.indigo .v { color: var(--indigo); }
+  .mb-stat .l { font-size: .7rem; text-transform: uppercase; letter-spacing: .8px; color: var(--faint); margin-top: .3rem; }
+  .mb-section { font-size: .78rem; text-transform: uppercase; letter-spacing: 1px; color: var(--faint); font-weight: 600; margin: 0 0 .7rem; display: flex; align-items: center; gap: .6rem; }
+  .mb-section + .spec-grid { margin-bottom: 1.5rem; }
+  .mb-section::after { content: ''; flex: 1; height: 1px; background: var(--border-soft); }
+  .spec-grid { display: grid; grid-template-columns: auto 1fr; gap: .55rem 1rem; font-size: .85rem; }
+  .spec-grid .k { color: var(--faint); white-space: nowrap; }
+  .spec-grid .v { color: var(--text); text-align: right; word-break: break-word; }
+  .spec-grid .v.mono { font-family: 'Cascadia Code','Consolas',monospace; font-size: .8rem; }
+  .spec-grid .v .chip { background: rgba(236,229,216,.9); border: 1px solid var(--border); color: var(--text); padding: .12rem .5rem; border-radius: 999px; font-family: 'Cascadia Code','Consolas',monospace; font-size: .78rem; }
+
+  .modal.modal-sm { max-width: 460px; }
+  .mh-icon { width: 46px; height: 46px; border-radius: 14px; flex-shrink: 0; display: grid; place-items: center; font-size: 1.3rem; color: #fff; background: linear-gradient(135deg, var(--blue), #507392); box-shadow: 0 10px 18px -14px rgba(53,94,125,.65); }
+  .mh-icon.success { background: linear-gradient(135deg, #3e6b54, #58856d); box-shadow: 0 10px 18px -14px rgba(62,107,84,.7); font-weight: 700; }
+  .field-label { display: block; font-size: .82rem; font-weight: 600; color: var(--dim); margin-bottom: .5rem; }
+  .field-label .opt { color: var(--faint); font-weight: 500; }
+  .field-input { width: 100%; background: rgba(255,255,255,.68); border: 1px solid var(--border); border-radius: 14px; padding: .74rem .85rem; color: var(--text); font-size: .9rem; outline: none; transition: border-color .18s, box-shadow .18s, background .18s; }
+  .field-input::placeholder { color: var(--faint); }
+  .field-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53,94,125,.12); background: #fff; }
+  .field-help { font-size: .8rem; color: var(--faint); line-height: 1.55; margin-top: .75rem; }
+  .field-help code { font-family: 'Cascadia Code','Consolas',monospace; color: var(--dim); background: var(--bg-soft); padding: .05rem .35rem; border-radius: 5px; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: .65rem; padding: 1.1rem 1.5rem 1.4rem; }
+  .key-reveal { display: flex; align-items: center; gap: .6rem; background: rgba(236,229,216,.55); border: 1px solid var(--border); border-radius: 14px; padding: .55rem .55rem .55rem .85rem; }
+  .key-reveal code { flex: 1; min-width: 0; font-family: 'Cascadia Code','Consolas',monospace; font-size: .82rem; color: var(--green); word-break: break-all; }
+  .btn-copy { background: rgba(255,253,248,.8); border: 1px solid var(--border); color: var(--text); padding: .5rem .9rem; border-radius: 999px; cursor: pointer; font-size: .8rem; font-weight: 600; white-space: nowrap; transition: all .18s; flex-shrink: 0; }
+  .btn-copy:hover { background: #fff; border-color: var(--text); }
+
+  .api-usage-example {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.35rem;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .api-usage-example::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: linear-gradient(180deg, rgba(53,94,125,.9), rgba(62,107,84,.58));
+  }
+  .api-usage-example.collapsed .api-usage-body { display: none; }
+  .api-usage-example.collapsed .api-usage-toggle .chev { transform: rotate(-90deg); }
+  .api-usage-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    border: 1px solid var(--border);
+    background: rgba(255,253,248,.8);
+    color: var(--dim);
+    cursor: pointer;
+    font-size: .74rem;
+    font-weight: 600;
+    padding: .42rem .75rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    transition: transform .18s, box-shadow .18s, border-color .18s, background .18s, color .18s;
+    box-shadow: 0 10px 18px -18px rgba(31,26,20,.5);
+  }
+  .api-usage-toggle:hover {
+    color: var(--text);
+    border-color: var(--text);
+    background: #fff;
+    transform: translateY(-1px);
+  }
+  .api-usage-toggle:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(53,94,125,.12), 0 10px 20px -16px rgba(31,26,20,.5);
+  }
+  .api-usage-toggle .chev { font-size: .95rem; line-height: 1; transition: transform .18s ease; }
+  .api-usage-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .75rem; }
+  .api-usage-title { font-size: .85rem; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: .5rem; min-width: 0; }
+  .api-usage-title .icon { color: var(--blue); }
+  .api-usage-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: .2rem;
+    padding: .22rem;
+    background: rgba(236,229,216,.72);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    flex-shrink: 0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.42);
+  }
+  .api-usage-tab {
+    border: none;
+    background: transparent;
+    color: var(--dim);
+    padding: .33rem .75rem;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: .74rem;
+    font-weight: 600;
+    transition: background .18s, color .18s, box-shadow .18s, transform .18s;
+  }
+  .api-usage-tab:hover { color: var(--text); }
+  .api-usage-tab.active {
+    color: var(--card);
+    background: var(--text);
+    box-shadow: 0 8px 14px -12px rgba(31,26,20,.7);
+  }
+  .api-usage-code {
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: .75rem;
+    color: #304351;
+    background: #fbf8f1;
+    border: 1px solid var(--border-soft);
+    border-radius: 14px;
+    padding: .85rem .9rem;
+    margin-bottom: .75rem;
+    overflow-x: auto;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .api-usage-note { font-size: .75rem; color: var(--faint); line-height: 1.5; }
+  .api-usage-note code { background: var(--bg-soft); padding: .05rem .35rem; border-radius: 5px; color: var(--dim); font-family: 'Cascadia Code', 'Consolas', monospace; }
+  .code-keyword { color: #87568f; }
+  .code-module { color: #2f7a8b; }
+  .code-class { color: #98546e; }
+  .code-name { color: #1f1a14; }
+  .code-attr { color: #355e7d; }
+  .code-string { color: #996f22; }
+  .code-number { color: #3e6b54; }
+  .code-literal { color: #b45443; }
+  .code-builtin { color: #355e7d; }
+  .code-option { color: #2f7a8b; }
+  .code-faint { color: #9a8f7f; }
+  .code-punc { color: #857a6a; }
+
+  @media (max-width: 720px) {
+    .topbar { padding: .9rem 1rem; }
+    .container { padding: 1.25rem 1rem 1.8rem; }
+    .default-model-bar { align-items: stretch; }
+    .model-form { margin-left: 0; width: 100%; }
+    .section-head .sh-action { margin-left: 0; width: 100%; }
+    .section-head .sh-action .btn-primary { width: 100%; justify-content: center; }
+    .apikey-row { align-items: flex-start; flex-wrap: wrap; }
+    .apikey-row .ak-created { text-align: left; }
+    .apikey-row .ak-actions { width: 100%; }
+    .apikey-row .ak-actions > * { flex: 1; }
+    .mb-stats { grid-template-columns: 1fr; }
+    .api-usage-head { align-items: flex-start; flex-direction: column; }
+  }
+
+  #app { display: none; }
+  #app.visible { display: block; animation: fade .35s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px);} to { opacity: 1; transform: none;} }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="box">
+    <div class="lhead">
+      <div class="logo"><img src="__BASE__/logo.png" alt="FreeLLM"></div>
+      <h2>FreeLLM</h2>
+      <div class="tag">Server dashboard</div>
+    </div>
+    <label for="loginKey">Admin Key</label>
+    <input type="password" id="loginKey" placeholder="Admin key" autofocus>
+    <div class="err" id="loginErr"></div>
+    <button id="loginBtn" onclick="login()">Continue</button>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="brand">
+      <span class="logo"><img src="__BASE__/logo.png" alt="FreeLLM"></span>
+      <div>
+        <div class="title">FreeLLM</div>
+        <div><small>ClusterName: <span id="clusterNameLabel">-</span></small></div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn-ghost" onclick="logout()">Sign out</button>
+  </div>
+
+  <div class="container">
+    <div class="stats">
+      <div class="stat blue">
+        <div class="label">Clients</div>
+        <div class="value" id="statTotal">0</div>
+      </div>
+      <div class="stat green">
+        <div class="label">Idle</div>
+        <div class="value" id="statIdle">0</div>
+      </div>
+      <div class="stat yellow">
+        <div class="label">Busy</div>
+        <div class="value" id="statBusy">0</div>
+      </div>
+    </div>
+
+    <div class="default-model-bar">
+      <span class="dm-label"><span class="ic">&#9881;</span> Default model</span>
+      <span id="currentModel" class="current">&mdash;</span>
+      <div class="model-form">
+        <select id="defaultModelInput"></select>
+        <button class="btn-primary" onclick="setDefaultModel()" id="defaultModelBtn">Save</button>
+      </div>
+      <span class="hint">Applies on next heartbeat.</span>
+    </div>
+
+    <div class="section-head">
+      <div class="sh-text">
+        <div class="sh-title"><span class="ic">&#128273;</span> API Keys <span class="count-badge" id="keyCount">0</span></div>
+        <div class="sh-sub">For <code>/v1/chat/completions</code>.</div>
+      </div>
+      <div class="sh-action">
+        <button class="btn-primary with-icon" onclick="openKeyModal()"><span class="plus">+</span> New Key</button>
+      </div>
+    </div>
+    <div id="apiKeyList" class="apikey-list"></div>
+
+    <div class="section-title">Clients <span class="count-badge" id="count">0</span></div>
+    <div id="grid" class="grid"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="detailModal" class="modal-overlay" onclick="if(event.target===this)closeDetail()">
+  <div class="modal" id="detailContent"></div>
+</div>
+
+<div id="keyModal" class="modal-overlay" onclick="if(event.target===this)closeKeyModal()">
+  <div class="modal modal-sm">
+    <div id="keyModalForm">
+      <div class="modal-head">
+        <div class="mh-icon">&#128273;</div>
+        <div class="mh-titles">
+          <div class="mh-name">New API Key</div>
+        </div>
+        <button class="modal-close" onclick="closeKeyModal()" title="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label" for="apiKeyName">Name <span class="opt">optional</span></label>
+        <input class="field-input" type="text" id="apiKeyName" placeholder="Mobile app" autocomplete="off">
+        <p class="field-help">Add a label if it helps you recognize the key later.</p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-ghost" onclick="closeKeyModal()">Cancel</button>
+        <button class="btn-primary" id="createKeyBtn" onclick="createApiKey()">Create</button>
+      </div>
+    </div>
+    <div id="keyModalResult" style="display:none">
+      <div class="modal-head">
+        <div class="mh-icon success">&#10003;</div>
+        <div class="mh-titles">
+          <div class="mh-name">Key Ready</div>
+          <div class="mh-sub">Copy once</div>
+        </div>
+        <button class="modal-close" onclick="closeKeyModal()" title="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="key-reveal">
+          <code id="newKeyValue"></code>
+          <button class="btn-copy" id="copyNewKeyBtn" onclick="copyNewKey()">Copy</button>
+        </div>
+        <p class="field-help">This value is shown once. It has also been copied to your clipboard.</p>
+      </div>
+      <div class="modal-foot">
+        <button class="btn-primary" onclick="closeKeyModal()">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Sub-path the dashboard is served under (injected by the server, e.g. "/freellm").
+// Empty when served at the domain root. All API/asset calls are built from this.
+const BASE = "__BASE__";
+const MODEL_MAPS = "__MODEL_MAPS__";
+const CLUSTER_NAME = "__CLUSTER_NAME__";
+function api(p) { return BASE + p; }
+const grid = document.getElementById('grid');
+const toast = document.getElementById('toast');
+const countEl = document.getElementById('count');
+const loginEl = document.getElementById('login');
+const appEl = document.getElementById('app');
+const clusterNameEl = document.getElementById('clusterNameLabel');
+let apiKey = sessionStorage.getItem('freellm_api_key') || '';
+let refreshTimer = null;
+let clientsById = {};
+let openDetailId = null;
+let usageExampleTab = 'curl';
+
+clusterNameEl.textContent = CLUSTER_NAME || '-';
+
+function engineLabel(engine) {
+  const chosen = String(engine || '').trim().toLowerCase();
+  if (!chosen) return 'Unknown';
+  if (chosen === 'ollama') return 'Ollama';
+  if (chosen === 'lemonade') return 'Lemonade';
+  return chosen[0].toUpperCase() + chosen.slice(1);
+}
+
+function modelsForEngine(engine) {
+  const chosen = String(engine || '').trim().toLowerCase();
+  const engineMap = MODEL_MAPS[chosen];
+  if (!engineMap || typeof engineMap !== 'object') return [];
+  return Object.keys(engineMap).sort((a, b) => a.localeCompare(b));
+}
+
+function allPublicModels() {
+  const names = new Set();
+  Object.values(MODEL_MAPS || {}).forEach(engineMap => {
+    if (!engineMap || typeof engineMap !== 'object') return;
+    Object.keys(engineMap).forEach(model => names.add(model));
+  });
+  return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function ensureSelectValue(select, model) {
+  if (!select || !model) return;
+  const wanted = String(model);
+  const existing = Array.from(select.options).find(option => option.value === wanted);
+  if (!existing) {
+    const option = document.createElement('option');
+    option.value = wanted;
+    option.textContent = wanted;
+    select.appendChild(option);
+  }
+  select.value = wanted;
+}
+
+function populateDefaultModelSelect(currentModel) {
+  const select = document.getElementById('defaultModelInput');
+  if (!select) return;
+
+  const models = allPublicModels();
+  select.innerHTML = '';
+  if (!models.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'No configured default models';
+    select.appendChild(option);
+    select.disabled = true;
+    return;
+  }
+
+  models.forEach(model => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    select.appendChild(option);
+  });
+  select.disabled = false;
+  ensureSelectValue(select, currentModel || models[0]);
+}
+
+function buildModelSelect(client) {
+  const select = document.createElement('select');
+  const models = modelsForEngine(client.engine);
+  const selectedModel = client.assigned_model || client.model;
+  if (!models.length) {
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = 'No configured models for ' + engineLabel(client.engine);
+    select.appendChild(empty);
+    select.disabled = true;
+    return select;
+  }
+
+  models.forEach(model => {
+    const option = document.createElement('option');
+    option.value = model;
+    option.textContent = model;
+    if (model === selectedModel) option.selected = true;
+    select.appendChild(option);
+  });
+  return select;
+}
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+}
+
+function ago(ts) {
+  const s = Math.floor(Date.now()/1000 - ts);
+  if (s < 5) return 'just now';
+  if (s < 60) return s + 's ago';
+  return Math.floor(s/60) + 'm ago';
+}
+
+function showToast(msg, isError) {
+  toast.textContent = msg;
+  toast.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => toast.className = 'toast', 3000);
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML.replace(/'/g, '&#39;');
+}
+
+async function login() {
+  const input = document.getElementById('loginKey');
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginErr');
+  const key = input.value.trim();
+  err.textContent = '';
+  if (!key) { err.textContent = 'API key required'; return; }
+  btn.disabled = true;
+  btn.textContent = 'Checking...';
+  try {
+    const res = await fetch(api('/clients'), { headers: { 'Authorization': 'Bearer ' + key } });
+    if (res.status === 401 || res.status === 403) {
+      err.textContent = 'Invalid API key';
+      return;
+    }
+    if (!res.ok) {
+      err.textContent = 'Server error (HTTP ' + res.status + ')';
+      return;
+    }
+    apiKey = key;
+    sessionStorage.setItem('freellm_api_key', key);
+    enterApp();
+  } catch (e) {
+    err.textContent = 'Network error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Continue';
+  }
+}
+
+function logout() {
+  apiKey = '';
+  sessionStorage.removeItem('freellm_api_key');
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  appEl.classList.remove('visible');
+  loginEl.style.display = 'flex';
+  document.getElementById('loginKey').value = '';
+  document.getElementById('loginErr').textContent = '';
+}
+
+function enterApp() {
+  loginEl.style.display = 'none';
+  appEl.classList.add('visible');
+  populateDefaultModelSelect();
+  refresh();
+  loadDefaultModel();
+  loadApiKeys();
+  refreshTimer = setInterval(refresh, 5000);
+}
+
+async function loadDefaultModel() {
+  try {
+    const res = await fetch(api('/default_model'), { headers: authHeaders() });
+    if (!res.ok) return;
+    const data = await res.json();
+    document.getElementById('currentModel').textContent = data.model || '\u2014';
+    populateDefaultModelSelect(data.model || '');
+    // Refresh API keys display to update examples with new model
+    loadApiKeys();
+  } catch (e) {
+    console.error('Failed to load default model:', e);
+  }
+}
+
+async function setDefaultModel() {
+  const inp = document.getElementById('defaultModelInput');
+  const btn = document.getElementById('defaultModelBtn');
+  const name = inp.value.trim();
+  if (!name) return;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    const res = await fetch(api('/default_model'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({model_name: name})
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Default model saved');
+    await loadDefaultModel();
+  } catch (e) {
+    showToast('Failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save';
+  }
+}
+
+function maskKey(k) {
+  if (!k || k.length <= 16) return k || '';
+  return k.slice(0, 12) + '\u2026' + k.slice(-4);
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function indent(level) {
+  return '  '.repeat(level);
+}
+
+function renderJsonValue(value, level) {
+  if (value === null) {
+    return '<span class="code-literal">null</span>';
+  }
+  if (typeof value === 'string') {
+    return '<span class="code-string">"' + escapeHtml(value) + '"</span>';
+  }
+  if (typeof value === 'number') {
+    return '<span class="code-number">' + value + '</span>';
+  }
+  if (typeof value === 'boolean') {
+    return '<span class="code-literal">' + (value ? 'true' : 'false') + '</span>';
+  }
+  if (Array.isArray(value)) {
+    if (!value.length) {
+      return '<span class="code-punc">[]</span>';
+    }
+    const childLevel = level + 1;
+    const items = value.map((item, index) => {
+      const suffix = index < value.length - 1 ? '<span class="code-punc">,</span>' : '';
+      return indent(childLevel) + renderJsonValue(item, childLevel) + suffix;
+    });
+    return [
+      '<span class="code-punc">[</span>',
+      items.join('\n'),
+      indent(level) + '<span class="code-punc">]</span>'
+    ].join('\n');
+  }
+  const entries = Object.entries(value || {});
+  if (!entries.length) {
+    return '<span class="code-punc">{}</span>';
+  }
+  const childLevel = level + 1;
+  const lines = entries.map(([key, entryValue], index) => {
+    const suffix = index < entries.length - 1 ? '<span class="code-punc">,</span>' : '';
+    return indent(childLevel)
+      + '<span class="code-string">"' + escapeHtml(key) + '"</span>'
+      + '<span class="code-punc">:</span> '
+      + renderJsonValue(entryValue, childLevel)
+      + suffix;
+  });
+  return [
+    '<span class="code-punc">{</span>',
+    lines.join('\n'),
+    indent(level) + '<span class="code-punc">}</span>'
+  ].join('\n');
+}
+
+function generateCurlExample(apiKey, model) {
+  const baseUrl = window.location.origin + BASE + '/v1/chat/completions';
+  const payload = {
+    model: model || 'Qwen/Qwen3.5-0.8B',
+    messages: [{ role: 'user', content: 'Hello!' }],
+    chat_template_kwargs: { enable_thinking: false }
+  };
+
+  return [
+    '<span class="code-builtin">curl</span> <span class="code-option">-X</span> <span class="code-string">POST</span> <span class="code-string">"' + escapeHtml(baseUrl) + '"</span> <span class="code-faint">\\</span>',
+    indent(1) + '<span class="code-option">-H</span> <span class="code-string">"Content-Type: application/json"</span> <span class="code-faint">\\</span>',
+    indent(1) + '<span class="code-option">-H</span> <span class="code-string">"Authorization: Bearer ' + escapeHtml(apiKey) + '"</span> <span class="code-faint">\\</span>',
+    indent(1) + '<span class="code-option">-d</span> <span class="code-punc">\'</span>',
+    renderJsonValue(payload, 1),
+    '<span class="code-punc">\'</span>'
+  ].join('\n');
+}
+
+function generatePythonExample(apiKey, model) {
+  const baseUrl = window.location.origin + BASE + '/v1';
+  return [
+    '<span class="code-keyword">from</span> <span class="code-module">openai</span> <span class="code-keyword">import</span> <span class="code-class">OpenAI</span>',
+    '',
+    '<span class="code-name">client</span> = <span class="code-class">OpenAI</span>(',
+    indent(1) + '<span class="code-attr">api_key</span>=<span class="code-string">"' + escapeHtml(apiKey) + '"</span>,',
+    indent(1) + '<span class="code-attr">base_url</span>=<span class="code-string">"' + escapeHtml(baseUrl) + '"</span>,',
+    ')',
+    '',
+    '<span class="code-name">response</span> = <span class="code-name">client</span>.<span class="code-name">chat</span>.<span class="code-name">completions</span>.<span class="code-name">create</span>(',
+    indent(1) + '<span class="code-attr">model</span>=<span class="code-string">"' + escapeHtml(model || 'Qwen/Qwen3.5-0.8B') + '"</span>,',
+    indent(1) + '<span class="code-attr">messages</span>=[{<span class="code-string">"role"</span>: <span class="code-string">"user"</span>, <span class="code-string">"content"</span>: <span class="code-string">"Hello!"</span>}],',
+    indent(1) + '<span class="code-attr">chat_template_kwargs</span>={<span class="code-string">"enable_thinking"</span>: <span class="code-literal">False</span>},',
+    ')',
+    '',
+    '<span class="code-name">print</span>(<span class="code-name">response</span>.<span class="code-name">choices</span>[<span class="code-number">0</span>].<span class="code-name">message</span>.<span class="code-name">content</span>)'
+  ].join('\n');
+}
+
+async function copyToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function loadApiKeys() {
+  try {
+    const res = await fetch(api('/api_keys'), { headers: authHeaders() });
+    if (!res.ok) return;
+    renderApiKeys(await res.json());
+  } catch (e) {
+    console.error('Failed to load API keys:', e);
+  }
+}
+
+function renderApiKeys(keys) {
+  const list = document.getElementById('apiKeyList');
+  document.getElementById('keyCount').textContent = keys.length;
+  list.innerHTML = '';
+  if (!keys.length) {
+    list.innerHTML = '<div class="apikey-empty">No keys yet.</div>';
+    return;
+  }
+  
+  // Get current default model
+  let currentModel = document.getElementById('currentModel').textContent || 'Qwen/Qwen3.5-0.8B';
+  if (currentModel === '—' || currentModel === '\u2014') {
+    currentModel = 'Qwen/Qwen3.5-0.8B';
+  }
+  
+  // Add usage example section for the first key
+  if (keys.length > 0) {
+    const firstKey = keys[0];
+    const exampleSection = document.createElement('div');
+    exampleSection.className = 'api-usage-example collapsed';
+    
+    const exampleHead = document.createElement('div');
+    exampleHead.className = 'api-usage-head';
+
+    const exampleTitle = document.createElement('div');
+    exampleTitle.className = 'api-usage-title';
+    exampleTitle.innerHTML = '<span class="icon">💡</span> Quick start';
+
+    const toggleButton = document.createElement('button');
+    toggleButton.type = 'button';
+    toggleButton.className = 'api-usage-toggle';
+    toggleButton.innerHTML = '<span class="chev">▾</span><span class="label">Show</span>';
+
+    const tabs = document.createElement('div');
+    tabs.className = 'api-usage-tabs';
+    
+    const exampleBody = document.createElement('div');
+    exampleBody.className = 'api-usage-body';
+
+    const exampleCode = document.createElement('div');
+    exampleCode.className = 'api-usage-code';
+    
+    const tabDefs = [
+      { id: 'curl', label: 'cURL', generator: generateCurlExample },
+      { id: 'python', label: 'Python', generator: generatePythonExample }
+    ];
+
+    const setUsageTab = (tabId) => {
+      usageExampleTab = tabId;
+      const activeTab = tabDefs.find(tab => tab.id === tabId) || tabDefs[0];
+      exampleCode.innerHTML = activeTab.generator(firstKey.key, currentModel);
+      tabs.querySelectorAll('.api-usage-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+        btn.setAttribute('aria-pressed', btn.dataset.tab === tabId ? 'true' : 'false');
+      });
+    };
+
+    const syncUsageCollapse = () => {
+      const isCollapsed = exampleSection.classList.contains('collapsed');
+      toggleButton.querySelector('.label').textContent = isCollapsed ? 'Show' : 'Hide';
+      toggleButton.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    };
+
+    toggleButton.addEventListener('click', () => {
+      exampleSection.classList.toggle('collapsed');
+      syncUsageCollapse();
+    });
+
+    tabDefs.forEach(tab => {
+      const btn = document.createElement('button');
+      btn.className = 'api-usage-tab';
+      btn.type = 'button';
+      btn.dataset.tab = tab.id;
+      btn.textContent = tab.label;
+      btn.setAttribute('aria-pressed', 'false');
+      btn.addEventListener('click', () => setUsageTab(tab.id));
+      tabs.appendChild(btn);
+    });
+
+    exampleHead.append(exampleTitle, toggleButton);
+    
+    const exampleNote = document.createElement('div');
+    exampleNote.className = 'api-usage-note';
+    exampleNote.innerHTML = 'Endpoint: <code>/v1/chat/completions</code>.';
+    
+    exampleBody.append(tabs, exampleCode, exampleNote);
+    exampleSection.append(exampleHead, exampleBody);
+    setUsageTab(usageExampleTab);
+    syncUsageCollapse();
+    list.appendChild(exampleSection);
+  }
+  
+  // Render API key rows
+  keys.forEach(k => {
+    const row = document.createElement('div');
+    row.className = 'apikey-row';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'ak-avatar';
+    avatar.textContent = '\ud83d\udd11';
+
+    const info = document.createElement('div');
+    info.className = 'ak-info';
+    info.innerHTML =
+      '<div class="ak-name">' + (k.name ? esc(k.name) : '<span class="unnamed">Untitled</span>') + '</div>' +
+      '<div class="ak-key">' + esc(maskKey(k.key)) + '</div>';
+
+    const created = document.createElement('div');
+    created.className = 'ak-created';
+    created.textContent = k.created ? new Date(k.created * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+
+    const actions = document.createElement('div');
+    actions.className = 'ak-actions';
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn-ghost';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', async () => {
+      showToast((await copyToClipboard(k.key)) ? 'Key copied to clipboard' : 'Copy failed', false);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-danger';
+    delBtn.textContent = 'Revoke';
+    delBtn.addEventListener('click', () => deleteApiKey(k.key, k.name));
+
+    actions.append(copyBtn, delBtn);
+    row.append(avatar, info, created, actions);
+    list.appendChild(row);
+  });
+}
+
+function openKeyModal() {
+  document.getElementById('keyModalForm').style.display = '';
+  document.getElementById('keyModalResult').style.display = 'none';
+  const inp = document.getElementById('apiKeyName');
+  inp.value = '';
+  document.getElementById('keyModal').classList.add('show');
+  setTimeout(() => inp.focus(), 50);
+}
+
+function closeKeyModal() {
+  document.getElementById('keyModal').classList.remove('show');
+}
+
+async function createApiKey() {
+  const inp = document.getElementById('apiKeyName');
+  const btn = document.getElementById('createKeyBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  try {
+    const res = await fetch(api('/api_keys'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ name: inp.value.trim() })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const entry = await res.json();
+    document.getElementById('newKeyValue').textContent = entry.key;
+    document.getElementById('keyModalForm').style.display = 'none';
+    document.getElementById('keyModalResult').style.display = '';
+    copyToClipboard(entry.key);
+    loadApiKeys();
+  } catch (e) {
+    showToast('Failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Create';
+  }
+}
+
+async function copyNewKey() {
+  const btn = document.getElementById('copyNewKeyBtn');
+  const ok = await copyToClipboard(document.getElementById('newKeyValue').textContent);
+  btn.textContent = ok ? 'Copied' : 'Copy failed';
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+}
+
+async function deleteApiKey(key, name) {
+  if (!confirm('Revoke API key' + (name ? " '" + name + "'" : '') + '?')) return;
+  try {
+    const res = await fetch(api('/api_keys/' + encodeURIComponent(key)), {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('API key revoked');
+    loadApiKeys();
+  } catch (e) {
+    showToast('Failed: ' + e.message, true);
+  }
+}
+
+async function assignModel(clientId, inputEl, btn) {
+  const modelPath = inputEl.value.trim();
+  if (!modelPath) return;
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  try {
+    const res = await fetch(api('/assign_model'), {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({client_id: clientId, model_name: modelPath})
+    });
+    if (!res.ok) throw new Error(await res.text());
+    showToast('Model assigned');
+    refresh();
+  } catch (e) {
+    showToast('Failed: ' + e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Assign';
+  }
+}
+
+async function refresh() {
+  try {
+    const res = await fetch(api('/clients'), { headers: authHeaders() });
+    if (res.status === 401 || res.status === 403) {
+      logout();
+      return;
+    }
+    if (!res.ok) {
+      grid.innerHTML = '<div class="empty">Could not load clients (HTTP ' + res.status + ')</div>';
+      countEl.textContent = '';
+      return;
+    }
+    const clients = await res.json();
+    clientsById = {};
+    clients.forEach(c => { clientsById[c.id] = c; });
+    const total = clients.length;
+    const busyCount = clients.filter(c => c.busy).length;
+    const idleCount = total - busyCount;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statIdle').textContent = idleCount;
+    document.getElementById('statBusy').textContent = busyCount;
+    countEl.textContent = total;
+    if (openDetailId) {
+      if (clientsById[openDetailId]) renderDetail(clientsById[openDetailId]);
+      else closeDetail();
+    }
+    if (!clients.length) {
+      grid.innerHTML = '<div class="empty"><div class="big">\ud83d\udda5\ufe0f</div>No clients online.</div>';
+      return;
+    }
+    grid.innerHTML = '';
+    clients.forEach(c => {
+      const name = c.hostname || c.id;
+      const card = document.createElement('div');
+      card.className = 'card' + (c.busy ? ' is-busy' : '');
+
+      const header = document.createElement('div');
+      header.className = 'card-header';
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = (name[0] || '?');
+
+      const titles = document.createElement('div');
+      titles.className = 'card-titles';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'client-name';
+      nameEl.textContent = name;
+      nameEl.title = name;
+      const subEl = document.createElement('div');
+      subEl.className = 'client-sub';
+      subEl.textContent = c.id;
+      titles.append(nameEl, subEl);
+
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + (c.busy ? 'busy' : 'online');
+      badge.innerHTML = '<span class="dot"></span>' + (c.busy ? 'Busy' : 'Idle');
+
+      header.append(avatar, titles, badge);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML =
+        '<span class="k">Engine</span><span class="v">' + esc(engineLabel(c.engine)) + '</span>' +
+        '<span class="k">Model</span><span class="v">' + (c.model ? '<span class="chip">' + esc(c.model) + '</span>' : '\u2014') + '</span>' +
+        '<span class="k">Assigned</span><span class="v">' + (c.assigned_model ? '<span class="chip">' + esc(c.assigned_model) + '</span>' : 'Default model') + '</span>' +
+        '<span class="k">Jobs</span><span class="v">' + (c.requests || 0) + '</span>' +
+        '<span class="k">Seen</span><span class="v">' + ago(c.last_seen) + '</span>';
+
+      const form = document.createElement('div');
+      form.className = 'model-form';
+      form.addEventListener('click', function(e) { e.stopPropagation(); });
+      const inp = buildModelSelect(c);
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.textContent = 'Assign';
+      btn.disabled = inp.disabled;
+      btn.addEventListener('click', function(e) { e.stopPropagation(); assignModel(c.id, inp, btn); });
+      form.append(inp, btn);
+
+      card.addEventListener('click', function() { openDetail(c.id); });
+      card.append(header, meta, form);
+      grid.appendChild(card);
+    });
+  } catch (e) {
+    console.error('Refresh failed:', e);
+  }
+}
+
+function duration(seconds) {
+  const s = Math.max(0, Math.floor(seconds));
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + 'm ' + (s % 60) + 's';
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + 'h ' + (m % 60) + 'm';
+  const d = Math.floor(h / 24);
+  return d + 'd ' + (h % 24) + 'h';
+}
+
+function specRow(k, v, mono, raw) {
+  if (v === undefined || v === null || v === '') v = '\u2014';
+  const val = raw ? String(v) : esc(String(v));
+  return '<span class="k">' + esc(k) + '</span><span class="v' + (mono ? ' mono' : '') + '">' + val + '</span>';
+}
+
+function openDetail(id) {
+  openDetailId = id;
+  const c = clientsById[id];
+  if (!c) return;
+  renderDetail(c);
+  document.getElementById('detailModal').classList.add('show');
+}
+
+function closeDetail() {
+  openDetailId = null;
+  document.getElementById('detailModal').classList.remove('show');
+}
+
+function renderDetail(c) {
+  const name = c.hostname || c.id;
+  const specs = c.specs || {};
+  const nowS = Date.now() / 1000;
+  const connectedFor = c.first_seen ? duration(nowS - c.first_seen) : '\u2014';
+
+  const specRows =
+    specRow('Hostname', c.hostname) +
+    specRow('Engine', engineLabel(c.engine)) +
+    specRow('Current Model', c.model ? '<span class="chip">' + esc(c.model) + '</span>' : '\u2014', false, true) +
+    specRow('Assigned Model', c.assigned_model ? '<span class="chip">' + esc(c.assigned_model) + '</span>' : 'Default model', false, true) +
+    specRow('OS', specs.os) +
+    specRow('Arch', specs.arch) +
+    specRow('CPU', specs.processor) +
+    specRow('Cores', specs.cpu_cores) +
+    specRow('RAM', specs.ram_gb ? specs.ram_gb + ' GB' : '\u2014') +
+    specRow('GPU', specs.gpu_name || specs.gpu) +
+    specRow('VRAM', specs.gpu_vram_gb ? specs.gpu_vram_gb + ' GB' : (specs.gpu_memory_mb ? Math.round(specs.gpu_memory_mb) + ' MB' : '\u2014')) +
+    specRow('Version', specs.client_version, true) +
+    specRow('Uptime', connectedFor) +
+    specRow('Seen', ago(c.last_seen));
+
+  document.getElementById('detailContent').innerHTML =
+    '<div class="modal-head">' +
+      '<div class="avatar">' + esc(name[0] || '?') + '</div>' +
+      '<div class="mh-titles">' +
+        '<div class="mh-name">' + esc(name) + '</div>' +
+        '<div class="mh-sub">' + esc(c.id) + '</div>' +
+      '</div>' +
+      '<span class="badge ' + (c.busy ? 'busy' : 'online') + '"><span class="dot"></span>' + (c.busy ? 'Busy' : 'Idle') + '</span>' +
+      '<button class="modal-close" onclick="closeDetail()" title="Close">&times;</button>' +
+    '</div>' +
+    '<div class="modal-body">' +
+      '<div class="mb-stats">' +
+        '<div class="mb-stat blue"><div class="v">' + (c.requests || 0) + '</div><div class="l">Jobs</div></div>' +
+        '<div class="mb-stat ' + (c.busy ? '' : 'green') + '"><div class="v">' + (c.busy ? 'Busy' : 'Idle') + '</div><div class="l">State</div></div>' +
+        '<div class="mb-stat indigo"><div class="v">' + (specs.cpu_cores || '\u2014') + '</div><div class="l">Cores</div></div>' +
+      '</div>' +
+      '<div class="mb-section">System</div>' +
+      '<div class="spec-grid">' + specRows + '</div>' +
+    '</div>';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('keyModal').classList.contains('show')) { closeKeyModal(); return; }
+  if (openDetailId) closeDetail();
+});
+
+document.getElementById('loginKey').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') login();
+});
+
+document.getElementById('apiKeyName').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') createApiKey();
+});
+
+// Auto sign-in if a previously saved key is still valid.
+if (apiKey) {
+  fetch(api('/clients'), { headers: authHeaders() }).then(res => {
+    if (res.ok) enterApp();
+    else { apiKey = ''; sessionStorage.removeItem('freellm_api_key'); }
+  }).catch(() => {});
+}
+</script>
+
+</body>
+</html>
